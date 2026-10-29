@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Conn3x
+        env: &gh
+          GH_TOKEN: ${{ github.token }}
+        run: &install |
+          tag=$(gh release view -R conn3xorg/conn3x --json tagName -q .tagName)
+          file="conn3x_${tag#v}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "https://github.com/conn3xorg/conn3x/releases/download/$tag/$file"
+          curl -sSfLO "https://github.com/conn3xorg/conn3x/releases/download/$tag/checksums.txt"
+          grep " $file\$" checksums.txt | sha256sum -c -
+          mkdir -p bin && tar -xzf "$file" -C bin conn3x
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: conn3x version
+      - run: conn3x fmt -check -recursive
+      - name: Validate
+        run: conn3x init -backend=false && conn3x validate
+      - name: Validate the example
+        working-directory: examples/local
+        run: conn3x init -backend=false && conn3x validate
+
+  e2e:
+    needs: validate
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [rocky10, fedora45, ubuntu2404, debian13]
+    name: e2e (${{ matrix.distro }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The test host images live in the Conn3x repo.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: conn3xorg/conn3x
+          ref: main
+          path: conn3x
+          persist-credentials: false
+          sparse-checkout: test/images
+      - name: Install Conn3x
+        env: *gh
+        run: *install
+      - name: Start the ${{ matrix.distro }} host
+        working-directory: examples/local
+        env:
+          CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/${{ matrix.distro }}/Containerfile
+          # The host container is privileged, so Grafana's systemd unit can
+          # set up its sandbox.
+          PODMAN: sudo podman
+        run: ./up.sh
+      - name: Apply, then plan again with no changes
+        working-directory: examples/local
+        env:
+          TF_VAR_admin_password: Ci-only-pass-1
+        run: |
+          conn3x init
+          conn3x apply -auto-approve
+          conn3x plan -detailed-exitcode
+      - name: Change the admin password, then plan again with no changes
+        working-directory: examples/local
+        env:
+          TF_VAR_admin_password: Ci-only-pass-2
+        run: |
+          conn3x apply -auto-approve
+          conn3x plan -detailed-exitcode
+      - name: Check health, log in, and find the datasource and dashboard
+        run: |
+          sudo podman exec -i circuit-grafana sh -eu <<'EOF'
+          auth='admin:Ci-only-pass-2'
+          curl -sSf http://127.0.0.1:3000/api/health | tee /dev/stderr | grep -q '"database": *"ok"'
+          curl -sSf -u "$auth" http://127.0.0.1:3000/api/user | grep -q '"login":"admin"'
+          # Grafana provisions a few seconds after it starts answering.
+          for _ in $(seq 30); do
+            curl -sSf -u "$auth" http://127.0.0.1:3000/api/datasources | grep -q '"name":"Prometheus"' && break
+            sleep 1
+          done
+          curl -sSf -u "$auth" http://127.0.0.1:3000/api/datasources | tee /dev/stderr | grep -q '"name":"Prometheus"'
+          curl -sSf -u "$auth" 'http://127.0.0.1:3000/api/search?query=Hello' | grep -q '"uid":"conn3x-hello"'
+          EOF
+      - name: Clean up
+        if: always()
+        working-directory: examples/local
+        env:
+          PODMAN: sudo podman
+        run: ./down.sh

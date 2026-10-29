@@ -1,0 +1,14 @@
+{
+  "uid": "conn3x-hello",
+  "title": "Hello from Conn3x",
+  "schemaVersion": 41,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Hello",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 },
+      "options": { "mode": "markdown", "content": "Provisioned from `examples/local/dashboards`." }
+    }
+  ]
+}
