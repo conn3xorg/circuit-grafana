@@ -108,10 +108,10 @@ jobs:
           '
           sudo podman exec -d circuit-grafana sh -c 'cd /tmp && exec runuser -u nobody -- python3 -m http.server --bind 127.0.0.1 3000 > /tmp/listener.log 2>&1'
           sleep 3
-          ! conn3x apply -auto-approve
+          if conn3x apply -auto-approve; then echo "apply should have refused" >&2; exit 1; fi
           sudo podman exec circuit-grafana sh -ec '
             pkill -f [h]ttp.server || true
-            ! grep -q /api/user /tmp/listener.log
+            if grep -q /api/user /tmp/listener.log; then echo "the listener got a request" >&2; exit 1; fi
             :
             systemctl start grafana-server
             for _ in $(seq 60); do [ "$(curl -sk -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health)" != 000 ] && break; sleep 2; done
