@@ -96,6 +96,28 @@ jobs:
           curl -sSf -u "$auth" http://127.0.0.1:3000/api/datasources | tee /dev/stderr | grep -q '"name":"Prometheus"'
           curl -sSf -u "$auth" 'http://127.0.0.1:3000/api/search?query=Hello' | grep -q '"uid":"conn3x-hello"'
           EOF
+      - name: Another process on the port gets no password
+        working-directory: examples/local
+        env:
+          TF_VAR_admin_password: Ci-only-pass-3
+        run: |
+          sudo podman exec circuit-grafana sh -ec '
+            command -v python3 >/dev/null || { apt-get -qq update && apt-get -qq install -y python3 || dnf -q install -y python3; } >/dev/null
+            systemctl stop grafana-server
+            :
+          '
+          sudo podman exec -d circuit-grafana sh -c 'cd /tmp && exec runuser -u nobody -- python3 -m http.server --bind 127.0.0.1 3000 > /tmp/listener.log 2>&1'
+          sleep 3
+          ! conn3x apply -auto-approve
+          sudo podman exec circuit-grafana sh -ec '
+            pkill -f [h]ttp.server || true
+            ! grep -q /api/user /tmp/listener.log
+            :
+            systemctl start grafana-server
+            for _ in $(seq 60); do [ "$(curl -sk -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health)" != 000 ] && break; sleep 2; done
+          '
+          conn3x apply -auto-approve
+          conn3x plan -detailed-exitcode
       - name: Clean up
         if: always()
         working-directory: examples/local

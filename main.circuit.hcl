@@ -89,8 +89,12 @@ locals {
   check_host = contains(["0.0.0.0", "::"], var.http_addr) ? "127.0.0.1" : strcontains(var.http_addr, ":") ? "[${var.http_addr}]" : var.http_addr
   url        = "http://${local.check_host}:${var.http_port}"
 
-  # The password reaches curl on stdin, so it never shows in ps.
-  login = "printf 'user = \"admin:%s\"\\n' \"$(cat ${local.password_file})\" | curl -sf -K- -o /dev/null ${local.url}/api/user"
+  # The password reaches curl on stdin, so it never shows in ps, and it's only
+  # sent to a port held by root or the grafana user.
+  held  = <<-EOT
+    held() { p=$(printf ':%04X$' ${var.http_port}); u=$(id -u grafana); cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk -v p="$p" -v u="$u" '$4 == "0A" && $2 ~ p { n++; if ($8 != u && $8 != 0) b = 1 } END { exit !(n && !b) }'; }
+  EOT
+  login = "${local.held} held && printf 'user = \"admin:%s\"\\n' \"$(cat ${local.password_file})\" | curl -sf -K- -o /dev/null ${local.url}/api/user"
 }
 
 circuit "grafana" {
