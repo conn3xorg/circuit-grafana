@@ -1,5 +1,7 @@
 # circuit-grafana
 
+[![Conn3x grade](https://conn3x.org/circuits/grafana/grade.svg)](https://conn3x.org/circuits/grafana/grade)
+
 A Conn3x circuit that installs Grafana OSS from Grafana Labs' own apt and yum repositories, writes `grafana.ini` from a handful of inputs, and provisions your datasources and dashboards from files. It's the self-hosted counterpart to Grafana Cloud: the same Grafana, on a machine you run.
 
 Most of Grafana is easy to install. The part that bites later is the admin password: `admin_password` in `grafana.ini` only counts on the very first start, so changing it afterwards does nothing, quietly. The circuit sets it on the first start, resets it with `grafana cli` whenever you change it, and keeps it out of state. It also pins the release, listens on `127.0.0.1` until you say otherwise, and turns off the usage reporting and update checks Grafana does by default.
