@@ -93,7 +93,7 @@ jobs:
           conn3x apply -auto-approve
           conn3x plan -detailed-exitcode
       - name: Check health, log in, and find the datasource and dashboard
-        run: |
+        run: &health |
           sudo podman exec -i circuit-grafana sh -eu <<'EOF'
           auth='admin:Ci-only-pass-2'
           curl -sSf http://127.0.0.1:3000/api/health | tee /dev/stderr | grep -q '"database": *"ok"'
@@ -106,6 +106,18 @@ jobs:
           curl -sSf -u "$auth" http://127.0.0.1:3000/api/datasources | tee /dev/stderr | grep -q '"name":"Prometheus"'
           curl -sSf -u "$auth" 'http://127.0.0.1:3000/api/search?query=Hello' | grep -q '"uid":"conn3x-hello"'
           EOF
+      # Restarting the container boots systemd again, so this checks Grafana
+      # is enabled and comes back with its config, database and provisioning.
+      - name: Restart the host, then wait for Grafana
+        run: |
+          sudo podman restart circuit-grafana
+          sudo podman exec circuit-grafana timeout 60 systemctl is-system-running --wait || true
+          for _ in $(seq 60); do
+            sudo podman exec circuit-grafana curl -sf http://127.0.0.1:3000/api/health >/dev/null && break
+            sleep 1
+          done
+      - name: Check health, log in, and find the datasource and dashboard after the restart
+        run: *health
       - name: Another process on the port gets no password
         working-directory: examples/local
         env:
