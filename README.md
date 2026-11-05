@@ -16,7 +16,7 @@ variable "grafana_admin_password" {
 }
 
 module "grafana" {
-  source = "github.com/conn3xorg/circuit-grafana?ref=v0.1.1"
+  source = "github.com/conn3xorg/circuit-grafana?ref=v0.1.2"
 
   hosts                = { dash = "192.168.1.50" }
   ssh_private_key_file = "~/.ssh/id_ed25519"
