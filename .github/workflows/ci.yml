@@ -48,6 +48,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The release tags, to find the previous default grafana_version.
+          fetch-depth: 0
       # The test host images live in the Conn3x repo.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,14 +69,43 @@ jobs:
           # set up its sandbox.
           PODMAN: sudo podman
         run: ./up.sh
-      - name: Apply, then plan again with no changes
+      # The newest release whose default grafana_version differs from this
+      # one's, so the next step is the upgrade users make. A package upgrade
+      # resets /etc/grafana, which a fresh install never shows.
+      - name: Apply the previous default Grafana
         working-directory: examples/local
         env:
           TF_VAR_admin_password: Ci-only-pass-1
         run: |
+          default() { sed -n '/^variable "grafana_version"/,/^}/s/^ *default *= *"\(.*\)"/\1/p'; }
+          current=$(default < ../../variables.tf)
+          for tag in $(git tag --sort=-v:refname); do
+            previous=$(git show "$tag:variables.tf" | default)
+            [ "$previous" != "$current" ] && break
+          done
+          [ -n "$previous" ] && [ "$previous" != "$current" ]
+          echo "Upgrading from Grafana $previous ($tag) to $current."
+          printf 'module "grafana" {\n  grafana_version = "%s"\n}\n' "$previous" > upgrade_override.tf
           conn3x init
           conn3x apply -auto-approve
+          sudo podman exec circuit-grafana grafana server -v | grep -F "$previous"
+      - name: Upgrade to the current default, then plan again with no changes
+        working-directory: examples/local
+        env:
+          TF_VAR_admin_password: Ci-only-pass-1
+        run: |
+          rm upgrade_override.tf
+          conn3x apply -auto-approve
           conn3x plan -detailed-exitcode
+      # The modes and owners main.circuit.hcl sets, which the rpm and the
+      # deb reset on an upgrade.
+      - name: Check /etc/grafana after the upgrade
+        run: |
+          sudo podman exec circuit-grafana sh -eu <<'EOF'
+          stat -c '%n %a %U:%G' /etc/grafana /etc/grafana/dashboards | tee /dev/stderr > /tmp/modes
+          printf '%s\n' '/etc/grafana 755 root:grafana' '/etc/grafana/dashboards 750 root:grafana' | diff - /tmp/modes
+          curl -sSf http://127.0.0.1:3000/api/health | grep -q '"database": *"ok"'
+          EOF
       # The example's secrets reach the host write-only, so state holds
       # none of them, and nothing Conn3x writes under .terraform does either.
       # .terraform/modules is left out: it holds downloaded module code.
