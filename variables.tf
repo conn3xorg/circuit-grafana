@@ -40,12 +40,12 @@ variable "ssh_become" {
 
 variable "grafana_version" {
   type        = string
-  default     = "13.3.0"
-  description = "Grafana OSS release to install, such as \"13.3.0\". Raising it upgrades Grafana in place."
+  default     = "13.3.2"
+  description = "Grafana OSS release to install, such as \"13.3.2\". Raising it upgrades Grafana in place."
 
   validation {
     condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.grafana_version))
-    error_message = "grafana_version must be a full release, such as \"13.3.0\"."
+    error_message = "grafana_version must be a full release, such as \"13.3.2\"."
   }
 }
 

@@ -112,7 +112,7 @@ On each host, in order:
 | `ssh_known_hosts_file` | string | `null` | known_hosts file to check host keys against. When null, `~/.ssh/known_hosts`. Not used for a host object with `host_key`. |
 | `ssh_become` | bool | `false` | Run commands as root through sudo. Set it when `ssh_user` isn't root. |
 | `admin_password` | string | Required | Password for Grafana's `admin` user. Ephemeral and sensitive: pass it with `-var` or `TF_VAR_`. At least 8 characters, with no quotes, backslashes or spaces. Changing it resets the password in Grafana. |
-| `grafana_version` | string | `"13.3.0"` | Grafana OSS release to install. Raising it upgrades in place. |
+| `grafana_version` | string | `"13.3.2"` | Grafana OSS release to install. Raising it upgrades in place. |
 | `http_addr` | string | `"127.0.0.1"` | IP address Grafana listens on. `"0.0.0.0"` listens on every address. |
 | `http_port` | number | `3000` | Port Grafana listens on. |
 | `domain` | string | `null` | `[server]` `domain`. When null, Grafana's default, `localhost`. |
@@ -135,7 +135,7 @@ Requires Conn3x v0.6.5 or later and systemd on each host, with outbound HTTPS to
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13, with Grafana 13.3.0. [examples/local](examples/local) was applied to each on arm64, and the second plan had no changes. Then the admin password changed, and the plan after that was clean too. `/api/health` answered, `admin` logged in with the new password, and the provisioned datasource and dashboard were there. On each, renaming the datasource while keeping its `uid` replaced the old one rather than leaving both. CI runs the same checks on amd64. An upgrade from 13.2.5 to 13.3.0 on Rocky Linux 10 came back running, with the password and datasource intact.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13, with Grafana 13.3.0. [examples/local](examples/local) was applied to each on arm64, and the second plan had no changes. Then the admin password changed, and the plan after that was clean too. `/api/health` answered, `admin` logged in with the new password, and the provisioned datasource and dashboard were there. On each, renaming the datasource while keeping its `uid` replaced the old one rather than leaving both. CI runs the same checks on amd64. An upgrade from 13.2.5 to 13.3.0 on Rocky Linux 10 came back running, with the password and datasource intact. v0.2.1 moved the default to 13.3.2, and CI ran the same checks with it on all four on amd64.
 
 On an Ubuntu 24.04 droplet and a Rocky Linux 10 droplet with SELinux enforcing, both `s-1vcpu-1gb`, the circuit applied with `http_addr = "0.0.0.0"`, `domain` and `root_url`. From another machine, `/api/health` answered, `admin` logged in, and the datasource and dashboard were there. Both came back after a password change and a reboot with Grafana running, the new password working and the second plan clean. On Rocky Linux Grafana runs as `unconfined_service_t`, and the audit log had no denials.
 
