@@ -16,7 +16,7 @@ variable "grafana_admin_password" {
 }
 
 module "grafana" {
-  source = "github.com/conn3xorg/circuit-grafana?ref=v0.2.1"
+  source = "github.com/conn3xorg/circuit-grafana?ref=v0.2.2"
 
   hosts                = { dash = "192.168.1.50" }
   ssh_private_key_file = "~/.ssh/id_ed25519"
@@ -135,7 +135,7 @@ Requires Conn3x v0.6.5 or later and systemd on each host, with outbound HTTPS to
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13, with Grafana 13.3.0. [examples/local](examples/local) was applied to each on arm64, and the second plan had no changes. Then the admin password changed, and the plan after that was clean too. `/api/health` answered, `admin` logged in with the new password, and the provisioned datasource and dashboard were there. On each, renaming the datasource while keeping its `uid` replaced the old one rather than leaving both. CI runs the same checks on amd64. An upgrade from 13.2.5 to 13.3.0 on Rocky Linux 10 came back running, with the password and datasource intact. v0.2.1 moved the default to 13.3.2, and CI ran the same checks with it on all four on amd64.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13, with Grafana 13.3.0. [examples/local](examples/local) was applied to each on arm64, and the second plan had no changes. Then the admin password changed, and the plan after that was clean too. `/api/health` answered, `admin` logged in with the new password, and the provisioned datasource and dashboard were there. On each, renaming the datasource while keeping its `uid` replaced the old one rather than leaving both. CI runs the same checks on amd64. An upgrade from 13.2.5 to 13.3.0 on Rocky Linux 10 came back running, with the password and datasource intact. v0.2.1 moved the default to 13.3.2, and CI ran the same checks with it on all four on amd64. circuit-lempa-homelab's CI then upgraded from circuit-grafana v0.1.2 (13.3.0) to v0.2.2 (13.3.2) on all four, and the plan after was clean.
 
 On an Ubuntu 24.04 droplet and a Rocky Linux 10 droplet with SELinux enforcing, both `s-1vcpu-1gb`, the circuit applied with `http_addr = "0.0.0.0"`, `domain` and `root_url`. From another machine, `/api/health` answered, `admin` logged in, and the datasource and dashboard were there. Both came back after a password change and a reboot with Grafana running, the new password working and the second plan clean. On Rocky Linux Grafana runs as `unconfined_service_t`, and the audit log had no denials.
 
