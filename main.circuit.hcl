@@ -134,6 +134,16 @@ circuit "grafana" {
     }
   }
 
+  # Each upgrade resets /etc/grafana. The rpm puts it back to 0775
+  # root:root, and Conn3x then refuses to read grafana.ini under it. The
+  # deb chmods every directory in it to 0755, dashboards too.
+  step "etc_mode" {
+    command {
+      command  = "chown root:grafana /etc/grafana && chmod 0755 /etc/grafana && if [ -d ${local.dashboards_dir} ]; then chmod 0750 ${local.dashboards_dir}; fi"
+      triggers = { package = conn3x_package.grafana__package[each.key].revision }
+    }
+  }
+
   # Grafana reads the password itself on its first start, through
   # $__file{} in grafana.ini, so its group can read it.
   step "password_dir" {
