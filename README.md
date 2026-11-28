@@ -16,7 +16,7 @@ variable "grafana_admin_password" {
 }
 
 module "grafana" {
-  source = "github.com/conn3xorg/circuit-grafana?ref=v0.2.2"
+  source = "github.com/conn3xorg/circuit-grafana?ref=v0.3.0"
 
   hosts                = { dash = "192.168.1.50" }
   ssh_private_key_file = "~/.ssh/id_ed25519"
@@ -131,7 +131,7 @@ On each host, in order:
 
 ## Requirements
 
-Requires Conn3x v0.6.5 or later and systemd on each host, with outbound HTTPS to apt.grafana.com or rpm.grafana.com. The droplets it was tested on had 1 GB of memory. amd64 and arm64.
+Requires Conn3x v0.39.0 or later and systemd on each host, with outbound HTTPS to apt.grafana.com or rpm.grafana.com. The droplets it was tested on had 1 GB of memory. amd64 and arm64.
 
 ## Tested on
 

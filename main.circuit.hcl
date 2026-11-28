@@ -218,15 +218,39 @@ circuit "grafana" {
   # it's what starts it, twice: datasources Grafana provisions on its very
   # first start come out without the mark prune looks for, and a second
   # start sets it, so removing them from the list later removes them.
+  # Asked before the restart below: on a first start there's no database
+  # yet.
+  probe "fresh" {
+    command = "test -e /var/lib/grafana/grafana.db"
+  }
+
   step "restart" {
-    command {
-      command = "if [ -e /var/lib/grafana/grafana.db ]; then systemctl restart grafana-server; else systemctl restart grafana-server && for _ in $(seq 60); do curl -sf -o /dev/null ${local.url}/api/health && break; sleep 2; done && sleep 5 && systemctl restart grafana-server; fi"
+    service_action {
+      name = "grafana-server"
       triggers = {
         package     = conn3x_package.grafana__package[each.key].revision
         config      = conn3x_file.grafana__config[each.key].revision
         datasources = conn3x_file.grafana__datasources[each.key].revision
         provider    = conn3x_file.grafana__dashboard_provider[each.key].revision
       }
+    }
+  }
+
+  # Only on a first start: wait for Grafana to finish provisioning, then
+  # start it once more, below.
+  step "first_start" {
+    only_if = data.conn3x_command.grafana__fresh[each.key].exit_code != 0
+    command {
+      command  = "for _ in $(seq 60); do curl -sf -o /dev/null ${local.url}/api/health && break; sleep 2; done && sleep 5"
+      triggers = { restart = conn3x_service_action.grafana__restart[each.key].revision }
+    }
+  }
+
+  step "second_start" {
+    only_if = data.conn3x_command.grafana__fresh[each.key].exit_code != 0
+    service_action {
+      name     = "grafana-server"
+      triggers = { first_start = conn3x_command.grafana__first_start[each.key].revision }
     }
   }
 
@@ -242,8 +266,11 @@ circuit "grafana" {
   # answer. The admin step below needs it answering.
   step "ready" {
     command {
-      command  = "for _ in $(seq 60); do curl -sf -o /dev/null ${local.url}/api/health && exit 0; sleep 2; done; echo 'Grafana did not answer on ${local.url} within two minutes. See journalctl -u grafana-server.' >&2; exit 1"
-      triggers = { restart = conn3x_command.grafana__restart[each.key].revision }
+      command = "for _ in $(seq 60); do curl -sf -o /dev/null ${local.url}/api/health && exit 0; sleep 2; done; echo 'Grafana did not answer on ${local.url} within two minutes. See journalctl -u grafana-server.' >&2; exit 1"
+      triggers = {
+        restart      = conn3x_service_action.grafana__restart[each.key].revision
+        second_start = conn3x_service_action.grafana__second_start[each.key].revision
+      }
     }
   }
 
